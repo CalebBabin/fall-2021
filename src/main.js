@@ -1,6 +1,6 @@
 import './main.css';
 import * as THREE from 'three';
-import Chat from 'twitch-chat-emotes';
+import TwitchChat from 'twitch-chat-emotes-threejs';
 import Stats from 'stats-js';
 
 // a default array of twitch channels to join
@@ -15,7 +15,12 @@ const query_parts = window.location.href.replace(/[?&]+([^=&]+)=([^&]*)/gi, func
 if (query_vars.channels) {
 	channels = query_vars.channels.split(',');
 }
-const ChatInstance = new Chat({
+const ChatInstance = new TwitchChat({
+	materialType: THREE.MeshBasicMaterial,
+	materialOptions: {
+		side: THREE.DoubleSide,
+		transparent: true,
+	},
 	channels,
 	maximumEmoteLimit: 3,
 })
@@ -69,27 +74,13 @@ const EasingFunctions = {
 	easeInOutQuint: t => t < .5 ? 16 * t * t * t * t * t : 1 + 16 * (--t) * t * t * t * t
 }
 
-const emoteTextures = {};
-const emoteMaterials = {};
 const pendingEmoteArray = [];
-ChatInstance.on("emotes", (e) => {
-	const output = { emotes: [], type: 'emote' };
-	for (let index = 0; index < e.emotes.length; index++) {
-		const emote = e.emotes[index];
-		if (!emoteTextures[emote.material.id]) {
-			emoteTextures[emote.material.id] = new THREE.CanvasTexture(emote.material.canvas);
-			emoteTextures[emote.material.id].sourceObject = emote.material;
-
-			emoteTextures[emote.material.id].magFilter = THREE.NearestFilter;
-
-			emoteMaterials[emote.material.id] = new THREE.MeshBasicMaterial({
-				map: emoteTextures[emote.material.id],
-				transparent: true,
-				side: THREE.DoubleSide,
-			})
-		}
-		output.emotes.push(emote);
+ChatInstance.listen((emotes) => {
+	const matArray = [];
+	for (let i = 0; i < emotes.length; i++) {
+		matArray.push(emotes[i].material);
 	}
+	const output = { emotes: matArray, type: 'emote' };
 	pendingEmoteArray.push(output);
 });
 
@@ -385,15 +376,6 @@ function draw() {
 
 	//inner_group.rotation.y += delta * 0.2;
 
-	for (const key in emoteTextures) {
-		if (emoteTextures.hasOwnProperty(key)) {
-			const element = emoteTextures[key];
-			if (element.sourceObject.needsUpdate) {
-				element.needsUpdate = true;
-				element.sourceObject.needsUpdate = false;
-			}
-		}
-	}
 	const noiseDate = (Date.now() - startFrame) / 9000;
 
 	for (let index = pendingEmoteArray.length - 1; index >= 0; index--) {
@@ -467,7 +449,7 @@ function draw() {
 						const emote = emotes.emotes[i];
 						if (emote && !emote.sprite) {
 							//emote.sprite = new THREE.Sprite(emoteMaterials[emote.material.id]);
-							emote.sprite = new THREE.Mesh(planeGeometry, emoteMaterials[emote.material.id]);
+							emote.sprite = new THREE.Mesh(planeGeometry, emote);
 							emote.sprite.scale.setScalar(emoteScale);
 							emote.sprite.position.x += offset * emoteScale;
 							emotes.group.add(emote.sprite);
