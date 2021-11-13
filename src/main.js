@@ -107,10 +107,10 @@ renderer.setSize(window.innerWidth, window.innerHeight);
 scene.background = new THREE.Color(0x0F1A23);
 scene.fog = new THREE.Fog(0x0F1A23, cameraDistance, cameraFar);
 
-const ambientLight = new THREE.AmbientLight(0x33495B, 0.5);
+const ambientLight = new THREE.AmbientLight(0xffffff, 0.1);
 scene.add(ambientLight);
 
-const backLight = new THREE.DirectionalLight(0xffffff, 0.5);
+const backLight = new THREE.DirectionalLight(0xffffff, 1);
 backLight.position.set(-0.1, 0.5, -1);
 scene.add(backLight)
 
@@ -124,13 +124,11 @@ backLight.shadow.camera.left = -10;
 backLight.shadow.camera.right = 10;
 backLight.shadow.camera.bottom = -10;
 backLight.shadow.camera.top = 10;
-const backLightShadowCameraHelper = new THREE.CameraHelper(backLight.shadow.camera);
-scene.add(backLightShadowCameraHelper);
-
-
+//const backLightShadowCameraHelper = new THREE.CameraHelper(backLight.shadow.camera);
+//scene.add(backLightShadowCameraHelper);
 
 const skyLight = new THREE.DirectionalLight(0xffffff, 1);
-skyLight.position.set(0, 10, 1);
+skyLight.position.set(0, 10, 2);
 skyLight.lookAt(0, 0, 0);
 scene.add(skyLight);
 
@@ -144,8 +142,8 @@ skyLight.shadow.camera.right = 15;
 skyLight.shadow.radius = 0;
 skyLight.shadow.intensity = 0.5;
 skyLight.castShadow = true;
-const skyLightShadowCameraHelper = new THREE.CameraHelper( skyLight.shadow.camera );
-scene.add( skyLightShadowCameraHelper );
+//const skyLightShadowCameraHelper = new THREE.CameraHelper( skyLight.shadow.camera );
+//scene.add( skyLightShadowCameraHelper );
 
 function resize() {
 	camera.aspect = window.innerWidth / window.innerHeight;
