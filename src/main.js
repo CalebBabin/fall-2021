@@ -1,7 +1,9 @@
 import './main.css';
 import * as THREE from 'three';
-import Chat from 'twitch-chat-emotes';
+import TwitchChat from 'twitch-chat-emotes-threejs';
 import Stats from 'stats-js';
+
+window.shaderPID = 100;
 
 // a default array of twitch channels to join
 let channels = ['moonmoon'];
@@ -15,7 +17,12 @@ const query_parts = window.location.href.replace(/[?&]+([^=&]+)=([^&]*)/gi, func
 if (query_vars.channels) {
 	channels = query_vars.channels.split(',');
 }
-const ChatInstance = new Chat({
+const ChatInstance = new TwitchChat({
+	materialType: THREE.MeshBasicMaterial,
+	materialOptions: {
+		side: THREE.DoubleSide,
+		transparent: true,
+	},
 	channels,
 	maximumEmoteLimit: 3,
 })
@@ -69,27 +76,13 @@ const EasingFunctions = {
 	easeInOutQuint: t => t < .5 ? 16 * t * t * t * t * t : 1 + 16 * (--t) * t * t * t * t
 }
 
-const emoteTextures = {};
-const emoteMaterials = {};
 const pendingEmoteArray = [];
-ChatInstance.on("emotes", (e) => {
-	const output = { emotes: [], type: 'emote' };
-	for (let index = 0; index < e.emotes.length; index++) {
-		const emote = e.emotes[index];
-		if (!emoteTextures[emote.material.id]) {
-			emoteTextures[emote.material.id] = new THREE.CanvasTexture(emote.material.canvas);
-			emoteTextures[emote.material.id].sourceObject = emote.material;
-
-			emoteTextures[emote.material.id].magFilter = THREE.NearestFilter;
-
-			emoteMaterials[emote.material.id] = new THREE.MeshBasicMaterial({
-				map: emoteTextures[emote.material.id],
-				transparent: true,
-				side: THREE.DoubleSide,
-			})
-		}
-		output.emotes.push(emote);
+ChatInstance.listen((emotes) => {
+	const matArray = [];
+	for (let i = 0; i < emotes.length; i++) {
+		matArray.push(emotes[i].material);
 	}
+	const output = { emotes: matArray, type: 'emote' };
 	pendingEmoteArray.push(output);
 });
 
@@ -107,10 +100,50 @@ camera.lookAt(0, 0, 0);
 
 const scene = new THREE.Scene();
 const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.setSize(window.innerWidth, window.innerHeight);
 
 scene.background = new THREE.Color(0x0F1A23);
 scene.fog = new THREE.Fog(0x0F1A23, cameraDistance, cameraFar);
+
+const ambientLight = new THREE.AmbientLight(0xffffff, 0.1);
+scene.add(ambientLight);
+
+const backLight = new THREE.DirectionalLight(0xffffff, 1);
+backLight.position.set(-0.1, 0.5, -1);
+scene.add(backLight)
+
+//Set up shadow properties for the backLight
+backLight.castShadow = true;
+backLight.shadow.mapSize.width = 1024;
+backLight.shadow.mapSize.height = 1024;
+backLight.shadow.camera.near = 0.5;
+backLight.shadow.camera.far = 10;
+backLight.shadow.camera.left = -10;
+backLight.shadow.camera.right = 10;
+backLight.shadow.camera.bottom = -10;
+backLight.shadow.camera.top = 10;
+//const backLightShadowCameraHelper = new THREE.CameraHelper(backLight.shadow.camera);
+//scene.add(backLightShadowCameraHelper);
+
+const skyLight = new THREE.DirectionalLight(0xffffff, 1);
+skyLight.position.set(0, 10, 2);
+skyLight.lookAt(0, 0, 0);
+scene.add(skyLight);
+
+//Set up shadow properties for the skyLight
+skyLight.shadow.mapSize.width = 1024;
+skyLight.shadow.mapSize.height = 1024;
+skyLight.shadow.camera.near = 1;
+skyLight.shadow.camera.far = 20;
+skyLight.shadow.camera.left = -15;
+skyLight.shadow.camera.right = 15;
+skyLight.shadow.radius = 0;
+skyLight.shadow.intensity = 0.5;
+skyLight.castShadow = true;
+//const skyLightShadowCameraHelper = new THREE.CameraHelper( skyLight.shadow.camera );
+//scene.add( skyLightShadowCameraHelper );
 
 function resize() {
 	camera.aspect = window.innerWidth / window.innerHeight;
@@ -171,18 +204,50 @@ const particleMaterial = new THREE.SpriteMaterial({
 	blendEquation: THREE.AddEquation,
 });
 
-import treeURL from './tree.png';
-const treeMaterial = new THREE.SpriteMaterial({
-	map: new THREE.TextureLoader().load(treeURL),
-	transparent: true,
-	side: THREE.FrontSide,
-});
-const tree = new THREE.Sprite(treeMaterial);
-tree.scale.setScalar(12.7);
-tree.position.x = 5;
-scene.add(tree);
+/*const lowPollyFoliageMaterial = new THREE.ShaderMaterial({
+	uniforms: cloudUniforms,
+	vertexShader: document.getElementById('vertexShader').textContent,
+	fragmentShader: document.getElementById('fragmentShader').textContent
+});*/
+/*const gradColors = new Uint8Array();
+gradColors[0] = 0x97623B;
+gradColors[1] = 0xC18737;
+gradColors[2] = 0x7F4326;*/
+import gradUrl from './grad.png';
+const gradMap = new THREE.TextureLoader().load(gradUrl);
+gradMap.magFilter = THREE.NearestFilter;
+gradMap.minFilter = THREE.NearestFilter;
+gradMap.generateMipmaps = false;
 
-import foliageFrontURL from './LeavesFront.png';
+import foliageMat from './materials/foliageMaterial';
+
+const lowPollyFoliage = new THREE.Mesh(
+	new THREE.IcosahedronBufferGeometry(1, 5),
+	foliageMat
+);
+lowPollyFoliage.castShadow = true;
+lowPollyFoliage.receiveShadow = true;
+lowPollyFoliage.rotation.x = 0.1;
+lowPollyFoliage.scale.y = 2;
+lowPollyFoliage.scale.z = 4;
+lowPollyFoliage.scale.x = 8;
+lowPollyFoliage.position.x = 4;
+lowPollyFoliage.position.y = 3.5;
+scene.add(lowPollyFoliage);
+
+import woodMat from './materials/woodMaterial';
+const treeTrunk = new THREE.Mesh(
+	new THREE.CylinderBufferGeometry(0.5, 0.75, 12, 32, 32, true),
+	woodMat
+);
+treeTrunk.castShadow = true;
+treeTrunk.receiveShadow = true;
+treeTrunk.rotation.z = -0.3;
+treeTrunk.position.x = 8;
+treeTrunk.position.y = -2;
+scene.add(treeTrunk);
+
+/*import foliageFrontURL from './LeavesFront.png';
 const foliageFrontMaterial = new THREE.SpriteMaterial({
 	map: new THREE.TextureLoader().load(foliageFrontURL),
 	transparent: true,
@@ -207,7 +272,7 @@ foliageBack.scale.setScalar(30);
 foliageBack.position.x = 0;
 foliageBack.position.y = -6.5;
 foliageBack.position.z = -3;
-scene.add(foliageBack);
+scene.add(foliageBack);*/
 
 
 import leafImageURL from './leaf1.png';
@@ -250,15 +315,6 @@ function draw() {
 
 	//inner_group.rotation.y += delta * 0.2;
 
-	for (const key in emoteTextures) {
-		if (emoteTextures.hasOwnProperty(key)) {
-			const element = emoteTextures[key];
-			if (element.sourceObject.needsUpdate) {
-				element.needsUpdate = true;
-				element.sourceObject.needsUpdate = false;
-			}
-		}
-	}
 	const noiseDate = (Date.now() - startFrame) / 9000;
 
 	for (let index = pendingEmoteArray.length - 1; index >= 0; index--) {
@@ -296,9 +352,9 @@ function draw() {
 			emotes.velocity.y += v.y - delta * 0.5;
 			//emotes.velocity.z += v.z;
 
-			emotes.group.rotation.x = v.x * Math.PI * 10;
-			emotes.group.rotation.y = v.y * Math.PI * 10;
-			emotes.group.rotation.z = v.z * Math.PI * 10;
+			emotes.group.rotation.x = v.x * Math.PI * 20;
+			emotes.group.rotation.y = v.y * Math.PI * 20;
+			emotes.group.rotation.z = v.z * Math.PI * 20;
 
 			/*if (emotes.group.position.y > 5) {
 				emotes.velocity.y -= (emotes.group.position.y-5)/100
@@ -332,7 +388,7 @@ function draw() {
 						const emote = emotes.emotes[i];
 						if (emote && !emote.sprite) {
 							//emote.sprite = new THREE.Sprite(emoteMaterials[emote.material.id]);
-							emote.sprite = new THREE.Mesh(planeGeometry, emoteMaterials[emote.material.id]);
+							emote.sprite = new THREE.Mesh(planeGeometry, emote);
 							emote.sprite.scale.setScalar(emoteScale);
 							emote.sprite.position.x += offset * emoteScale;
 							emotes.group.add(emote.sprite);
@@ -369,3 +425,4 @@ window.addEventListener('DOMContentLoaded', () => {
 	init();
 	draw();
 })
+
